@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # --------------------------------------------------------
   # INFLUXDB (Time-Series Database for sensor telemetry)
