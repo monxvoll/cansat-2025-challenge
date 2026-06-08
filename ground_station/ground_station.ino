@@ -1,5 +1,5 @@
-#include <SPI.h>
 #include <LoRa.h>
+#include <SPI.h>
 
 // Pins used by most ESP32 LoRa boards (TTGO, Heltec)
 #define ss 18
@@ -7,43 +7,39 @@
 #define dio0 26
 
 void setup() {
-  // Inicializamos a 115200 baudios (¡Importante para cuando programemos el script de Python!)
+  // Initialize serial communication at 115200 baud
   Serial.begin(115200);
-  while (!Serial);
+  while (!Serial)
+    ;
 
   Serial.println("CanSat Ground Station - Initializing...");
 
   LoRa.setPins(ss, rst, dio0);
-  
+
   // Initialize LoRa at 915 MHz (Must match the flight software)
   if (!LoRa.begin(915E6)) {
     Serial.println("Starting LoRa failed! Check wiring/antenna.");
-    while (1);
+    while (1)
+      ;
   }
-  
+
   Serial.println("LoRa Initialization OK!");
   Serial.println("Waiting for CanSat telemetry...");
 }
 
 void loop() {
-  // Intentar leer si ha llegado un paquete por el aire
+  // Try to read if a packet has arrived through the air
   int packetSize = LoRa.parsePacket();
-  
+
   if (packetSize) {
-    // Si llegó un paquete, lo leemos
+    // If a packet has arrived, we read it
     String incoming = "";
 
     while (LoRa.available()) {
       incoming += (char)LoRa.read();
     }
 
-    // Imprimir lo que recibimos por puerto Serial
-    // Como el CanSat nos envía un CSV, simplemente lo "pasamos" a la computadora
+    // Print what we receive via Serial port
+    // Since the CanSat sends us a CSV, we simply "pass it" to the computer
     Serial.println(incoming);
-    
-    // (Opcional) La intensidad de señal (RSSI) sirve para saber qué tan lejos está
-    // Serial.print(" [RSSI: ");
-    // Serial.print(LoRa.packetRssi());
-    // Serial.println("]");
   }
-}
