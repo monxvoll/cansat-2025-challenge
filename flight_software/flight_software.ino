@@ -1,6 +1,8 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <LoRa.h>
+#include <SPI.h>
 #include <Wire.h>
 
 #ifdef _ESP32_HAL_I2C_H_
@@ -8,8 +10,16 @@
 #define SCL_PIN 22
 #endif
 
+// Pins used by most ESP32 LoRa boards (TTGO, Heltec)
+#define ss 18
+#define rst 14
+#define dio0 26
+
 Adafruit_BMP280 bme; // I2C
 Adafruit_MPU6050 mpu;
+
+// Packet counter to track data sequence
+int packetCounter = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -22,7 +32,7 @@ void setup() {
   Wire.begin();
 #endif
 
-  // Inicializar MPU6050
+  // Initialize MPU6050
   if (!mpu.begin()) {
     Serial.println("Failed to find MPU6050 chip");
   } else {
@@ -31,43 +41,58 @@ void setup() {
     mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
   }
 
-  // Inicializar BMP280
-  // La dirección por defecto suele ser 0x76 o 0x77 dependiendo del módulo
+  // Initialize BMP280
+  // The default address is usually 0x76 or 0x77 depending on the module
   if (!bme.begin(0x76)) {
     if (!bme.begin(0x77)) {
       Serial.println("Could not find a valid BMP280 sensor, check wiring!");
     }
   }
+
+  // Initialize LoRa
+  LoRa.setPins(ss, rst, dio0);
+  // 915E6 is for America. Change to 433E6 for Europe/Asia if needed.
+  if (!LoRa.begin(915E6)) {
+    Serial.println("Starting LoRa failed!");
+  }
+  Serial.println("LoRa Initialization OK!");
 }
 
 void loop() {
-  // Eventos de lectura para MPU6050
+  // Reading events for MPU6050
   sensors_event_t a, g, temp_mpu;
   mpu.getEvent(&a, &g, &temp_mpu);
 
-  // Leer y enviar datos del acelerómetro
-  Serial.print("accelX: " + String(a.acceleration.x));
-  Serial.print("\taccelY: " + String(a.acceleration.y));
-  Serial.print("\taccelZ: " + String(a.acceleration.z));
+  // Read sensor values
+  float ax = a.acceleration.x;
+  float ay = a.acceleration.y;
+  float az = a.acceleration.z;
+  float gx = g.gyro.x;
+  float gy = g.gyro.y;
+  float gz = g.gyro.z;
 
-  // Leer y enviar datos del giroscopio
-  Serial.print("\tgyroX: " + String(g.gyro.x));
-  Serial.print("\tgyroY: " + String(g.gyro.y));
-  Serial.print("\tgyroZ: " + String(g.gyro.z));
+  float temp = bme.readTemperature();
+  float press = bme.readPressure() / 3377.0;
+  float alt = bme.readAltitude(1013.25); // Adjust pressure to local sea level
 
-  // Leer y enviar datos del BMP280
-  Serial.print("\tTemperature(*C): ");
-  Serial.print(bme.readTemperature());
+  // Format the data as a CSV (Comma Separated Values) string
+  // Format: PacketId, AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, Temp, Press,
+  // Altitude
+  String payload = String(packetCounter) + "," + String(ax) + "," + String(ay) +
+                   "," + String(az) + "," + String(gx) + "," + String(gy) +
+                   "," + String(gz) + "," + String(temp) + "," + String(press) +
+                   "," + String(alt);
 
-  Serial.print("\tPressure(Inches(Hg)): ");
-  Serial.print(bme.readPressure() / 3377.0);
+  // Send packet via LoRa
+  LoRa.beginPacket();
+  LoRa.print(payload);
+  LoRa.endPacket();
 
-  Serial.print("\tApproxAltitude(m): ");
-  Serial.print(
-      bme.readAltitude(1013.25)); // Ajustar presión al nivel del mar local
+  // Print to Serial for local debugging
+  Serial.println("LoRa TX: " + payload);
 
-  Serial.println(""); // Salto de línea para el siguiente paquete de datos
+  packetCounter++;
 
-  // La misión principal especifica enviar datos cada segundo
+  // The main mission specifies sending data every second
   delay(1000);
 }
