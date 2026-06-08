@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------------
+  # INFLUXDB (Time-Series Database for sensor telemetry)
+  # --------------------------------------------------------
+  influxdb:
+    image: influxdb:2.7
+    container_name: cansat_influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      # Auto-setup variables matching the Python script
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpassword
+      - DOCKER_INFLUXDB_INIT_ORG=cansat_team
+      - DOCKER_INFLUXDB_INIT_BUCKET=cansat_data
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=secret_token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    restart: always
+
+  # --------------------------------------------------------
+  # GRAFANA (Dashboard visualization)
+  # --------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cansat_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Default login credentials
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - influxdb
+    restart: always
+
+# Volumes to persist data even if the containers are stopped
+volumes:
+  influxdb-data:
+  grafana-data:
