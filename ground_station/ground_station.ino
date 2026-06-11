@@ -1,45 +1,45 @@
-#include <LoRa.h>
-#include <SPI.h>
+#include <RadioLib.h>
 
-// Pins used by most ESP32 LoRa boards (TTGO, Heltec)
-#define ss 18
-#define rst 14
-#define dio0 26
+SX1262 radio = new Module(8, 14, 12, 13);
+
+bool rxFlag = false;
+
+void rxCallback(void) { rxFlag = true; }
 
 void setup() {
-  // Initialize serial communication at 115200 baud
   Serial.begin(115200);
-  while (!Serial)
-    ;
+  delay(1000);
+  Serial.println("CanSat Ground Station — Iniciando...");
 
-  Serial.println("CanSat Ground Station - Initializing...");
-
-  LoRa.setPins(ss, rst, dio0);
-
-  // Initialize LoRa at 915 MHz (Must match the flight software)
-  if (!LoRa.begin(915E6)) {
-    Serial.println("Starting LoRa failed! Check wiring/antenna.");
-    while (1)
-      ;
+  // ⚠️ Parámetros IDÉNTICOS al flight software
+  int state = radio.begin(915.0, 125.0, 7, 5, 0xAB, 20);
+  if (state != RADIOLIB_ERR_NONE) {
+    Serial.print("LoRa falló, código: ");
+    Serial.println(state);
+    while (true);
   }
 
-  Serial.println("LoRa Initialization OK!");
-  Serial.println("Waiting for CanSat telemetry...");
+  radio.setDio1Action(rxCallback);
+  radio.startReceive();
+  Serial.println("LoRa OK! Esperando paquetes...");
 }
 
 void loop() {
-  // Try to read if a packet has arrived through the air
-  int packetSize = LoRa.parsePacket();
+  if (rxFlag) {
+    rxFlag = false;
 
-  if (packetSize) {
-    // If a packet has arrived, we read it
     String incoming = "";
+    int state = radio.readData(incoming);
 
-    while (LoRa.available()) {
-      incoming += (char)LoRa.read();
+    if (state == RADIOLIB_ERR_NONE) {
+      // Esta línea es la que lee serial_bridge.py
+      Serial.println(incoming);
+    } else {
+      Serial.print("Error RX, código: ");
+      Serial.println(state);
     }
 
-    // Print what we receive via Serial port
-    // Since the CanSat sends us a CSV, we simply "pass it" to the computer
-    Serial.println(incoming);
+    // Volver a escuchar
+    radio.startReceive();
   }
+}
