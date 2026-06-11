@@ -6,17 +6,18 @@ bool rxFlag = false;
 
 void rxCallback(void) { rxFlag = true; }
 
+// Setup pins:
 void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("CanSat Ground Station — Iniciando...");
 
-  // ⚠️ Parámetros IDÉNTICOS al flight software
   int state = radio.begin(915.0, 125.0, 7, 5, 0xAB, 20);
   if (state != RADIOLIB_ERR_NONE) {
     Serial.print("LoRa falló, código: ");
     Serial.println(state);
-    while (true);
+    while (true)
+      ;
   }
 
   radio.setDio1Action(rxCallback);
@@ -24,6 +25,7 @@ void setup() {
   Serial.println("LoRa OK! Esperando paquetes...");
 }
 
+// Main loop
 void loop() {
   if (rxFlag) {
     rxFlag = false;
@@ -32,14 +34,13 @@ void loop() {
     int state = radio.readData(incoming);
 
     if (state == RADIOLIB_ERR_NONE) {
-      // Esta línea es la que lee serial_bridge.py
       Serial.println(incoming);
     } else {
       Serial.print("Error RX, código: ");
       Serial.println(state);
     }
 
-    // Volver a escuchar
+    // Waiting for new packets
     radio.startReceive();
   }
 }
